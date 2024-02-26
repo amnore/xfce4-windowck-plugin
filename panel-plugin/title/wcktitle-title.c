@@ -40,10 +40,10 @@ void reload_wnck_title (WckTitlePlugin *wtp)
 }
 
 
-static gboolean is_window_on_active_workspace_and_no_other_maximized_windows_above(WnckWindow *window)
+static gboolean is_window_on_active_workspace_and_no_other_maximized_windows_above(XfwWindow *window)
 {
-    WnckWorkspace *workspace;
-    WnckScreen *screen;
+    XfwWorkspace *workspace;
+    XfwScreen *screen;
     GList *windows;
     GList *top_window;
     GList *bottom_window;
@@ -52,18 +52,19 @@ static gboolean is_window_on_active_workspace_and_no_other_maximized_windows_abo
         return TRUE;
     }
 
-    workspace = wnck_window_get_workspace(window);
-    screen = wnck_workspace_get_screen(workspace);
+    workspace = xfw_window_get_workspace(window);
+    screen = xfw_window_get_screen(window);
 
-    if (wnck_screen_get_active_workspace(screen) != workspace) {
+    if (!workspace
+       || !(xfw_workspace_get_state(workspace) & XFW_WORKSPACE_STATE_ACTIVE)) {
         return FALSE;
     }
 
-    windows = wnck_screen_get_windows_stacked(screen);
+    windows = xfw_screen_get_windows_stacked(screen);
     top_window = g_list_last(windows);
     bottom_window = g_list_first(windows);
     while (top_window->data != window && top_window != bottom_window) {
-        if (wnck_window_is_maximized((WnckWindow *)top_window->data)) {
+        if (xfw_window_is_maximized((XfwWindow *)top_window->data)) {
             return FALSE;
         }
         top_window = top_window->prev;
@@ -73,9 +74,9 @@ static gboolean is_window_on_active_workspace_and_no_other_maximized_windows_abo
 
 
 static gchar *
-get_title_color (WnckWindow *controlwindow, WckTitlePlugin *wtp)
+get_title_color (XfwWindow *controlwindow, WckTitlePlugin *wtp)
 {
-    if (wnck_window_is_active (controlwindow))
+    if (xfw_window_is_active (controlwindow))
     {
         /* window focused */
         /*~ gtk_widget_set_sensitive(GTK_WIDGET(wckp->title), TRUE); */
@@ -96,10 +97,15 @@ get_title_color (WnckWindow *controlwindow, WckTitlePlugin *wtp)
 /* Triggers when controlwindow's name changes */
 /* Warning! This function is called very often, so it should only do the most necessary things! */
 static void
-on_name_changed (WnckWindow *controlwindow, WckTitlePlugin *wtp)
+on_name_changed (XfwWindow *controlwindow, WckTitlePlugin *wtp)
 {
+    XfwApplication *application;
+    XfwApplicationInstance *instance;
+
     if (controlwindow
-        && wnck_window_get_pid(controlwindow)  /* if active window has been closed, pid is 0 */
+        && (application = xfw_window_get_application(controlwindow))
+        && (instance = xfw_application_get_instance(application, controlwindow))
+        && xfw_application_instance_get_pid(instance)  /* if active window has been closed, pid is 0 */
         && (!window_is_desktop (controlwindow)
             || wtp->prefs->show_on_desktop))
     {
@@ -113,7 +119,7 @@ on_name_changed (WnckWindow *controlwindow, WckTitlePlugin *wtp)
             return;
         }
 
-        title_text = wnck_window_get_name (controlwindow);
+        title_text = xfw_window_get_name (controlwindow);
 
         /* Set tooltips */
         if (wtp->prefs->show_tooltips)
@@ -185,7 +191,7 @@ on_name_changed (WnckWindow *controlwindow, WckTitlePlugin *wtp)
 }
 
 
-void on_wck_state_changed (WnckWindow *controlwindow, gpointer data)
+void on_wck_state_changed (XfwWindow *controlwindow, gpointer data)
 {
     WckTitlePlugin *wtp = data;
 
@@ -193,7 +199,7 @@ void on_wck_state_changed (WnckWindow *controlwindow, gpointer data)
 }
 
 
-void on_control_window_changed (WnckWindow *controlwindow, WnckWindow *previous, gpointer data)
+void on_control_window_changed (XfwWindow *controlwindow, XfwWindow *previous, gpointer data)
 {
     WckTitlePlugin *wtp = data;
 
@@ -271,7 +277,7 @@ gboolean on_title_pressed (GtkWidget *title, GdkEventButton *event, WckTitlePlug
         }
         else /* left-click */
         {
-            wnck_window_activate (wtp->win->controlwindow, gtk_get_current_event_time());
+            xfw_window_activate (wtp->win->controlwindow, gtk_get_current_event_time(), NULL);
         }
         return TRUE;
     }
@@ -279,7 +285,7 @@ gboolean on_title_pressed (GtkWidget *title, GdkEventButton *event, WckTitlePlug
     if (event->button == 3)
     {
         /* right-click */
-        wnck_window_activate (wtp->win->controlwindow, gtk_get_current_event_time());
+        xfw_window_activate (wtp->win->controlwindow, gtk_get_current_event_time(), NULL);
 
         /* let the panel show the menu */
         return TRUE;
@@ -297,7 +303,7 @@ gboolean on_title_released (GtkWidget *title, GdkEventButton *event, WckTitlePlu
     if (event->button == 2)
     {
         /* middle-click */
-        wnck_window_close(wtp->win->controlwindow, GDK_CURRENT_TIME);
+        xfw_window_close(wtp->win->controlwindow, GDK_CURRENT_TIME, NULL);
         return TRUE;
     }
 

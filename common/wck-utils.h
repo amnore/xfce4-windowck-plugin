@@ -25,17 +25,17 @@
 #ifndef WNCK_I_KNOW_THIS_IS_UNSTABLE
 #define WNCK_I_KNOW_THIS_IS_UNSTABLE
 #endif
-#include <libwnck/libwnck.h>
+#include <libxfce4windowing/libxfce4windowing.h>
 
 G_BEGIN_DECLS
 
 /* Wnck structure */
 typedef struct {
-    WnckScreen *activescreen;          // Active screen
-    WnckWorkspace *activeworkspace;    // Active workspace
-    WnckWindow *controlwindow;          // Controled window according to only_maximized option
-    WnckWindow *activewindow;          // Active window
-    WnckWindow *umaxwindow;            // Upper maximized window
+    XfwScreen *activescreen;          // Active screen
+    XfwWorkspaceManager *workspacemanager; // Workspace manager
+    XfwWindow *controlwindow;          // Controled window according to only_maximized option
+    XfwWindow *activewindow;          // Active window
+    XfwWindow *umaxwindow;            // Upper maximized window
 
     gulong msh;                         // upper maximized window state handler id
     gulong ash;                         // active state handler id
@@ -44,8 +44,9 @@ typedef struct {
     gulong sah;                         // active window changed handler id
     gulong sch;                         // window closed handler id
     gulong soh;                         // window opened handler id
-    gulong svh;                         // viewport changed handler id
-    gulong swh;                         // workspace changed handler id
+    GList *sgh;                         // workspace group handler ids
+    gulong sgch;                        // workspace group created handler id
+    gulong sgdh;                        // workspace group deleted handler id
 
     gboolean only_maximized;           // [T/F] Only track maximized windows
 
@@ -54,16 +55,16 @@ typedef struct {
 
 void init_wnck (WckUtils *win, gboolean only_maximized, gpointer data);
 void disconnect_wnck (WckUtils *win);
-void on_wck_state_changed (WnckWindow *controlwindow, gpointer data);
-void on_control_window_changed(WnckWindow *controlwindow, WnckWindow *previous, gpointer data);
+void on_wck_state_changed (XfwWindow *controlwindow, gpointer data);
+void on_control_window_changed(XfwWindow *controlwindow, XfwWindow *previous, gpointer data);
 void reload_wnck (WckUtils *win, gboolean only_maximized, gpointer data);
-void toggle_maximize (WnckWindow *window);
+void toggle_maximize (XfwWindow *window);
 gboolean wck_signal_handler_disconnect (GObject *object, gulong handler);
 
-inline gboolean
-window_is_desktop (WnckWindow *window)
+static inline gboolean
+window_is_desktop (XfwWindow *window)
 {
-    return wnck_window_get_window_type (window) == WNCK_WINDOW_DESKTOP;
+    return xfw_window_get_window_type (window) == XFW_WINDOW_TYPE_DESKTOP;
 }
 
 G_END_DECLS

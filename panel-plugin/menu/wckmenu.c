@@ -124,18 +124,6 @@ window_icon_new (void)
 }
 
 
-static void
-wckmenu_scale_factor (XfcePanelPlugin *plugin)
-{
-    gint scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (plugin));
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-    /* TODO switch to wnck_handle_set_default_icon_size() and wnck_handle_set_default_mini_icon_size() */
-    wnck_set_default_icon_size (WNCK_DEFAULT_ICON_SIZE * scale_factor);
-    wnck_set_default_mini_icon_size (WNCK_DEFAULT_MINI_ICON_SIZE * scale_factor);
-G_GNUC_END_IGNORE_DEPRECATIONS
-}
-
-
 static WckMenuPlugin *
 wckmenu_new (XfcePanelPlugin *plugin)
 {
@@ -184,10 +172,6 @@ wckmenu_new (XfcePanelPlugin *plugin)
     /* show widgets */
     gtk_widget_show(wmp->ebox);
     gtk_widget_show(wmp->box);
-
-    /* adapt wnck default icon size when UI scale changes */
-    wckmenu_scale_factor (plugin);
-    g_signal_connect (plugin, "notify::scale-factor", G_CALLBACK (wckmenu_scale_factor), NULL);
 
     return wmp;
 }

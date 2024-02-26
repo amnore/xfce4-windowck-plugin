@@ -236,17 +236,17 @@ wckbuttons_size_changed (XfcePanelPlugin  *plugin,
 static WBImageButton
 get_maximize_button_image (WckButtonsPlugin *wbp)
 {
-    return (wbp->win->controlwindow && wnck_window_is_maximized (wbp->win->controlwindow)) ? IMAGE_UNMAXIMIZE : IMAGE_MAXIMIZE;
+    return (wbp->win->controlwindow && xfw_window_is_maximized (wbp->win->controlwindow)) ? IMAGE_UNMAXIMIZE : IMAGE_MAXIMIZE;
 }
 
 void
-on_wck_state_changed (WnckWindow *controlwindow, gpointer data)
+on_wck_state_changed (XfwWindow *controlwindow, gpointer data)
 {
     WckButtonsPlugin *wbp = data;
     WBImageButton image_button = get_maximize_button_image (wbp);
     WBImageState image_state;
 
-    if (controlwindow && wnck_window_is_active (controlwindow))
+    if (controlwindow && xfw_window_is_active (controlwindow))
         image_state = IMAGE_FOCUSED;
     else
         image_state = IMAGE_UNFOCUSED;
@@ -258,7 +258,7 @@ on_wck_state_changed (WnckWindow *controlwindow, gpointer data)
 }
 
 void
-on_control_window_changed (WnckWindow *controlwindow, WnckWindow *previous, gpointer data)
+on_control_window_changed (XfwWindow *controlwindow, XfwWindow *previous, gpointer data)
 {
     WckButtonsPlugin *wbp = data;
 
@@ -312,7 +312,7 @@ on_button_hover_enter (WckButtonsPlugin *wbp, WBButton button, WBImageButton ima
 static gboolean
 on_button_hover_leave (WckButtonsPlugin *wbp, WBButton button, WBImageButton image_button)
 {
-    WBImageState image_state = wnck_window_is_active (wbp->win->controlwindow) ? IMAGE_FOCUSED : IMAGE_UNFOCUSED;
+    WBImageState image_state = xfw_window_is_active (wbp->win->controlwindow) ? IMAGE_FOCUSED : IMAGE_UNFOCUSED;
 
     gtk_image_set_from_pixbuf (wbp->button[button]->image, wbp->pixbufs[image_button][image_state]);
 
@@ -328,7 +328,7 @@ on_minimize_button_release (GtkWidget        *event_box,
 {
     if (event->button != 1) return FALSE;
 
-    wnck_window_minimize (wbp->win->controlwindow);
+    xfw_window_set_minimized (wbp->win->controlwindow, TRUE, NULL);
 
     return TRUE;
 }
@@ -422,7 +422,7 @@ on_close_button_release (GtkWidget        *event_box,
 {
     if (event->button != 1) return FALSE;
 
-    wnck_window_close(wbp->win->controlwindow, GDK_CURRENT_TIME);
+    xfw_window_close(wbp->win->controlwindow, GDK_CURRENT_TIME, NULL);
 
     return TRUE;
 }

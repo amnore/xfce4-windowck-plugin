@@ -25,17 +25,23 @@
 
 #include "wck-utils.h"
 
+typedef struct {
+    XfwWorkspaceGroup *workspace_group;
+    gulong svh; // viewport changed handler id
+    gulong swh; // workspace hanaged handler id
+} WorkspaceGroupHandlers;
+
+
 /* Prototypes */
-static WnckWindow *get_root_window(WnckScreen *screen);
-static WnckWindow *get_upper_maximized(WckUtils *);
+static XfwWindow *get_upper_maximized(WckUtils *);
 static void track_controlled_window (WckUtils *);
-static void active_workspace_changed(WnckScreen *, WnckWorkspace *, WckUtils *);
-static void active_window_changed(WnckScreen *, WnckWindow *, WckUtils *);
-static void track_changed_max_state(WnckWindow *, WnckWindowState, WnckWindowState, WckUtils *);
-static void on_umaxed_window_state_changed(WnckWindow *, WnckWindowState, WnckWindowState, WckUtils *);
-static void on_viewports_changed(WnckScreen *, WckUtils *);
-static void on_window_closed(WnckScreen *, WnckWindow *, WckUtils *);
-static void on_window_opened(WnckScreen *, WnckWindow *, WckUtils *);
+static void active_workspace_changed(XfwScreen *, XfwWorkspace *, WckUtils *);
+static void active_window_changed(XfwScreen *, XfwWindow *, WckUtils *);
+static void track_changed_max_state(XfwWindow *, XfwWindowState, XfwWindowState, WckUtils *);
+static void on_umaxed_window_state_changed(XfwWindow *, XfwWindowState, XfwWindowState, WckUtils *);
+static void on_viewports_changed(XfwScreen *, WckUtils *);
+static void on_window_closed(XfwScreen *, XfwWindow *, WckUtils *);
+static void on_window_opened(XfwScreen *, XfwWindow *, WckUtils *);
 
 
 gboolean wck_signal_handler_disconnect (GObject *object, gulong handler)
@@ -52,36 +58,25 @@ gboolean wck_signal_handler_disconnect (GObject *object, gulong handler)
 }
 
 
-static WnckWindow *get_root_window (WnckScreen *screen)
-{
-    GList *winstack = wnck_screen_get_windows_stacked(screen);
-    // we can't access data directly because sometimes we will get NULL or not desktop window
-    if (winstack && window_is_desktop (winstack->data))
-        return winstack->data;
-    else
-        return NULL;
-}
-
-
 /* Trigger when activewindow's workspaces changes */
-static void umax_window_workspace_changed (WnckWindow *window,                                                WckUtils *win)
+static void umax_window_workspace_changed (XfwWindow *window, WckUtils *win)
 {
         track_controlled_window (win);
 }
 
 
 /* Trigger when a specific window's state changes */
-static void track_changed_max_state (WnckWindow *window,
-                                         WnckWindowState changed_mask,
-                                         WnckWindowState new_state,
-                                         WckUtils *win)
+static void track_changed_max_state (XfwWindow *window,
+                                     XfwWindowState changed_mask,
+                                     XfwWindowState new_state,
+                                     WckUtils *win)
 {
     /* track the window max state only if it isn't the control window */
     if (window != win->controlwindow)
     {
         if (window
-            && !wnck_window_is_minimized(window)
-            && wnck_window_is_maximized(window))
+            && !xfw_window_is_minimized(window)
+            && xfw_window_is_maximized(window))
         {
             track_controlled_window (win);
         }
@@ -90,15 +85,15 @@ static void track_changed_max_state (WnckWindow *window,
 
 
 /* Triggers when umaxedwindow's state changes */
-static void on_umaxed_window_state_changed (WnckWindow *window,
-                                          WnckWindowState changed_mask,
-                                          WnckWindowState new_state,
-                                          WckUtils *win)
+static void on_umaxed_window_state_changed (XfwWindow *window,
+                                            XfwWindowState changed_mask,
+                                            XfwWindowState new_state,
+                                            WckUtils *win)
 {
     /* WARNING : only if window is unmaximized to prevent growing loop !!!*/
-    if (!wnck_window_is_maximized(window)
-        || wnck_window_is_minimized(window)
-        || changed_mask & (WNCK_WINDOW_STATE_ABOVE))
+    if (!xfw_window_is_maximized(window)
+        || xfw_window_is_minimized(window)
+        || changed_mask & (XFW_WINDOW_STATE_ABOVE))
     {
         track_controlled_window (win);
     }
@@ -109,20 +104,21 @@ static void on_umaxed_window_state_changed (WnckWindow *window,
 
 
 /* Returns the highest maximized window */
-static WnckWindow *get_upper_maximized (WckUtils *win)
+static XfwWindow *get_upper_maximized (WckUtils *win)
 {
-    WnckWindow      *umaxedwindow = NULL;
+    XfwWindow      *umaxedwindow = NULL;
+    XfwWorkspace *window_workspace;
 
-    GList *windows = wnck_screen_get_windows_stacked(win->activescreen);
+    GList *windows = xfw_screen_get_windows_stacked(win->activescreen);
 
     while (windows && windows->data)
     {
-        if (!win->activeworkspace
-            || wnck_window_is_in_viewport(windows->data, win->activeworkspace))
-            if (wnck_window_is_maximized(windows->data)
-                && !wnck_window_is_minimized(windows->data))
+        if ((window_workspace = xfw_window_get_workspace(windows->data))
+            && (xfw_workspace_get_state(window_workspace) & XFW_WORKSPACE_STATE_ACTIVE)
+            && xfw_window_is_maximized(windows->data)
+            && !xfw_window_is_minimized(windows->data))
         {
-                umaxedwindow = windows->data;
+            umaxedwindow = windows->data;
         }
         windows = windows->next;
     }
@@ -134,8 +130,9 @@ static WnckWindow *get_upper_maximized (WckUtils *win)
 /* track the new controlled window according to preferences */
 static void track_controlled_window (WckUtils *win)
 {
-    WnckWindow      *previous_umax = NULL;
-    WnckWindow      *previous_control = NULL;
+    XfwWindow       *previous_umax = NULL;
+    XfwWindow       *previous_control = NULL;
+    XfwWorkspace    *window_workspace = NULL;
 
     previous_control = win->controlwindow;
 
@@ -146,13 +143,11 @@ static void track_controlled_window (WckUtils *win)
         win->controlwindow = win->umaxwindow;
     }
     else if (win->activewindow
-            && (!win->activeworkspace
-                || wnck_window_is_in_viewport(win->activewindow, win->activeworkspace))
-            && !wnck_window_is_minimized(win->activewindow)
-            && (window_is_desktop (win->activewindow)
-                || !wnck_window_is_sticky(win->activewindow)))
+            && (window_workspace = xfw_window_get_workspace(win->activewindow))
+            && (xfw_workspace_get_state(window_workspace) & XFW_WORKSPACE_STATE_ACTIVE)
+            && !xfw_window_is_minimized(win->activewindow))
     {
-            win->controlwindow = win->activewindow;
+        win->controlwindow = win->activewindow;
     }
 
     if (!win->umaxwindow || (win->umaxwindow != previous_umax))
@@ -188,9 +183,6 @@ static void track_controlled_window (WckUtils *win)
         }
     }
 
-    if (!win->controlwindow)
-        win->controlwindow = get_root_window(win->activescreen);
-
     if (win->controlwindow != previous_control)
         on_control_window_changed(win->controlwindow, previous_control, win->data);
     else
@@ -199,34 +191,34 @@ static void track_controlled_window (WckUtils *win)
 
 
 /* Triggers when a new window has been opened */
-static void on_window_opened (WnckScreen *screen,
-                           WnckWindow *window,
-                           WckUtils *win)
+static void on_window_opened (XfwScreen *screen,
+                              XfwWindow *window,
+                              WckUtils *win)
 {
     // track new maximized window
-    if (wnck_window_is_maximized(window))
+    if (xfw_window_is_maximized(window))
         track_controlled_window (win);
 }
 
 
 /* Triggers when a window has been closed */
-static void on_window_closed (WnckScreen *screen,
-                           WnckWindow *window,
-                           WckUtils *win)
+static void on_window_closed (XfwScreen *screen,
+                              XfwWindow *window,
+                              WckUtils *win)
 {
     // track closed maximized window
-    if (wnck_window_is_maximized(window))
+    if (xfw_window_is_maximized(window))
         track_controlled_window (win);
 }
 
 
 /* Triggers when a new active window is selected */
-static void active_window_changed (WnckScreen *screen,
-                                   WnckWindow *previous,
+static void active_window_changed (XfwScreen *screen,
+                                   XfwWindow *previous,
                                    WckUtils *win)
 {
 
-    win->activewindow = wnck_screen_get_active_window(screen);
+    win->activewindow = xfw_screen_get_active_window(screen);
 
     if (win->activewindow
         && (win->activewindow != previous))
@@ -248,27 +240,35 @@ static void active_window_changed (WnckScreen *screen,
 
 /* Triggers when user changes viewports on Compiz */
 // We ONLY need this for Compiz (Marco doesn't use viewports)
-static void on_viewports_changed (WnckScreen *screen, WckUtils *win)
+static void on_viewports_changed (XfwScreen *screen, WckUtils *win)
 {
     reload_wnck (win, win->only_maximized, win->data);
 }
 
 
 /* Triggers when user changes workspace on Marco (?) */
-static void active_workspace_changed (WnckScreen *screen,
-                                      WnckWorkspace *previous,
+static void active_workspace_changed (XfwScreen *screen,
+                                      XfwWorkspace *previous,
                                       WckUtils *win)
 {
     reload_wnck (win, win->only_maximized, win->data);
 }
 
 
-void toggle_maximize (WnckWindow *window)
+/* Triggers when workspace groups are created or destroyed */
+static void on_workspace_group_changed(XfwWorkspaceManager *manager,
+                                       WckUtils *win)
 {
-    if (window && wnck_window_is_maximized(window))
-        wnck_window_unmaximize(window);
+    reload_wnck(win, win->only_maximized, win->data);
+}
+
+
+void toggle_maximize (XfwWindow *window)
+{
+    if (window && xfw_window_is_maximized(window))
+        xfw_window_set_maximized(window, TRUE, NULL);
     else
-        wnck_window_maximize(window);
+        xfw_window_set_maximized(window, FALSE, NULL);
 }
 
 
@@ -286,18 +286,9 @@ void init_wnck (WckUtils *win, gboolean only_maximized, gpointer data)
     win->data = data;
 
     /* get window proprieties */
-#if WNCK_CHECK_VERSION (43, 0, 0)
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-#endif
-    /* TODO switch to wnck_handle_get_default_screen() */
-    win->activescreen = wnck_screen_get_default ();
-#if WNCK_CHECK_VERSION (43, 0, 0)
-G_GNUC_END_IGNORE_DEPRECATIONS
-#endif
-    win->activeworkspace = wnck_screen_get_active_workspace(win->activescreen);
-    if (!win->activeworkspace)
-        win->activeworkspace = wnck_screen_get_workspace(win->activescreen, 0);
-    win->activewindow = wnck_screen_get_active_window(win->activescreen);
+    win->activescreen = xfw_screen_get_default();
+    win->workspacemanager = xfw_screen_get_workspace_manager(win->activescreen);
+    win->activewindow = xfw_screen_get_active_window(win->activescreen);
     win->umaxwindow = NULL;
     win->controlwindow = NULL;
     win->only_maximized = only_maximized;
@@ -311,8 +302,22 @@ G_GNUC_END_IGNORE_DEPRECATIONS
         win->soh = g_signal_connect(win->activescreen, "window-opened", G_CALLBACK (on_window_opened), win);
     }
 
-        win->svh = g_signal_connect(win->activescreen, "viewports-changed", G_CALLBACK (on_viewports_changed), win);
-        win->swh = g_signal_connect(win->activescreen, "active-workspace-changed", G_CALLBACK (active_workspace_changed), win);
+    win->sgch = g_signal_connect(win->workspacemanager, "workspace-group-created", G_CALLBACK(on_workspace_group_changed), win);
+    win->sgdh = g_signal_connect(win->workspacemanager, "workspace-group-destroyed", G_CALLBACK(on_workspace_group_changed), win);
+
+    win->sgh = NULL;
+    for (GList *workspace_groups =
+             xfw_workspace_manager_list_workspace_groups(win->workspacemanager);
+         workspace_groups;
+         workspace_groups = g_list_next(workspace_groups))
+    {
+        WorkspaceGroupHandlers *group_handlers = g_new(WorkspaceGroupHandlers, 1);
+        group_handlers->workspace_group = XFW_WORKSPACE_GROUP(workspace_groups->data);
+        group_handlers->svh = g_signal_connect(workspace_groups->data, "viewports-changed", G_CALLBACK(on_viewports_changed), win);
+        group_handlers->swh = g_signal_connect(workspace_groups->data, "active-workspace-changed", G_CALLBACK(active_workspace_changed), win);
+        g_object_ref(group_handlers->workspace_group);
+        win->sgh = g_list_prepend(win->sgh, group_handlers);
+    }
 
     /* Get controlled window */
     track_controlled_window (win);
@@ -324,6 +329,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
 void disconnect_wnck (WckUtils *win)
 {
+    WorkspaceGroupHandlers *handlers;
+
     /* disconnect all signal handlers */
     wck_signal_handler_disconnect (G_OBJECT(win->controlwindow), win->ash);
     wck_signal_handler_disconnect (G_OBJECT(win->controlwindow), win->msh);
@@ -332,6 +339,20 @@ void disconnect_wnck (WckUtils *win)
     wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->sah);
     wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->sch);
     wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->soh);
-    wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->svh);
-    wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->swh);
+
+    wck_signal_handler_disconnect(G_OBJECT(win->workspacemanager), win->sgch);
+    wck_signal_handler_disconnect(G_OBJECT(win->workspacemanager), win->sgdh);
+
+    for (GList *sgh = win->sgh; sgh; sgh = g_list_next(sgh))
+    {
+        handlers = (WorkspaceGroupHandlers *)sgh->data;
+        wck_signal_handler_disconnect(G_OBJECT(handlers->workspace_group),
+                                        handlers->svh);
+        wck_signal_handler_disconnect(G_OBJECT(handlers->workspace_group),
+                                        handlers->swh);
+        g_object_unref(handlers->workspace_group);
+        g_free(handlers);
+    }
+    g_list_free(win->sgh);
+    win->sgh = NULL;
 }
