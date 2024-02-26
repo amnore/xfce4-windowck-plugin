@@ -29,11 +29,12 @@ libwckbuttons_la_SOURCES = \
 
 libwckbuttons_la_CFLAGS = \
 	$(GTK_CFLAGS) \
-	$(LIBWNCK_CFLAGS) \
 	$(LIBXFCE4PANEL_CFLAGS) \
 	$(LIBXFCE4UI_CFLAGS) \
 	$(LIBXFCE4UTIL_CFLAGS) \
 	$(LIBXFCONF_CFLAGS) \
+	$(LIBXFCE4WINDOWING_CFLAGS) \
+	$(LIBXFCE4WINDOWINGUI_CFLAGS) \
 	$(PLATFORM_CFLAGS) \
 	-DDATADIR=\"$(datadir)\"
 
@@ -47,11 +48,12 @@ libwckbuttons_la_LDFLAGS = \
 libwckbuttons_la_LIBADD = \
 	$(top_builddir)/common/libwck-common.la \
 	$(GTK_LIBS) \
-	$(LIBWNCK_LIBS) \
 	$(LIBXFCE4PANEL_LIBS) \
 	$(LIBXFCE4UI_LIBS) \
 	$(LIBXFCE4UTIL_LIBS) \
-	$(LIBXFCONF_LIBS)
+	$(LIBXFCONF_LIBS) \
+	$(LIBXFCE4WINDOWING_LIBS) \
+	$(LIBXFCE4WINDOWINGUI_LIBS)
 
 libwckbuttons_la_DEPENDENCIES = \
 	$(top_builddir)/common/libwck-common.la

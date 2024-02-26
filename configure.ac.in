@@ -76,11 +76,12 @@ dnl *** Check for required packages ***
 dnl ***********************************
 XDT_CHECK_PACKAGE([GLIB], [glib-2.0], [2.50.0])
 XDT_CHECK_PACKAGE([GTK], [gtk+-3.0], [3.22.0])
-XDT_CHECK_PACKAGE([LIBWNCK], [libwnck-3.0], [3.22])
 XDT_CHECK_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-2.0], [4.14.0])
 XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-2], [4.14.0])
 XDT_CHECK_PACKAGE([LIBXFCE4UTIL], [libxfce4util-1.0], [4.14.0])
 XDT_CHECK_PACKAGE([LIBXFCONF], [libxfconf-0], [4.14.0])
+XDT_CHECK_PACKAGE([LIBXFCE4WINDOWING], [libxfce4windowing-0], [4.19.0])
+XDT_CHECK_PACKAGE([LIBXFCE4WINDOWINGUI], [libxfce4windowingui-0], [4.19.0])
 
 dnl ***********************************
 dnl *** Check for debugging support ***
