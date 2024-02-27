@@ -42,6 +42,8 @@ static void on_umaxed_window_state_changed(XfwWindow *, XfwWindowState, XfwWindo
 static void on_viewports_changed(XfwScreen *, WckUtils *);
 static void on_window_closed(XfwScreen *, XfwWindow *, WckUtils *);
 static void on_window_opened(XfwScreen *, XfwWindow *, WckUtils *);
+static void object_ref_nonnull(gpointer object);
+static void object_unref_nonnull(gpointer object);
 
 
 gboolean wck_signal_handler_disconnect (GObject *object, gulong handler)
@@ -55,6 +57,22 @@ gboolean wck_signal_handler_disconnect (GObject *object, gulong handler)
         }
     }
     return FALSE;
+}
+
+
+/* Increase reference count if object is not NULL */
+static void object_ref_nonnull(gpointer object)
+{
+    if (object)
+        g_object_ref(object);
+}
+
+
+/* Decrease reference count if object is not NULL */
+static void object_unref_nonnull(gpointer object)
+{
+    if (object)
+        g_object_unref(object);
 }
 
 
@@ -134,20 +152,28 @@ static void track_controlled_window (WckUtils *win)
     XfwWindow       *previous_control = NULL;
     XfwWorkspace    *window_workspace = NULL;
 
+    previous_umax = win->umaxwindow;
     previous_control = win->controlwindow;
+    object_ref_nonnull(previous_control);
+    object_ref_nonnull(previous_umax);
 
     if (win->only_maximized)
     {
-        previous_umax = win->umaxwindow;
+        object_unref_nonnull(win->umaxwindow);
+        object_unref_nonnull(win->controlwindow);
         win->umaxwindow = get_upper_maximized(win);
         win->controlwindow = win->umaxwindow;
+        object_ref_nonnull(win->umaxwindow);
+        object_ref_nonnull(win->controlwindow);
     }
     else if (win->activewindow
             && (window_workspace = xfw_window_get_workspace(win->activewindow))
             && (xfw_workspace_get_state(window_workspace) & XFW_WORKSPACE_STATE_ACTIVE)
             && !xfw_window_is_minimized(win->activewindow))
     {
+        object_unref_nonnull(win->controlwindow);
         win->controlwindow = win->activewindow;
+        object_ref_nonnull(win->controlwindow);
     }
 
     if (!win->umaxwindow || (win->umaxwindow != previous_umax))
@@ -173,7 +199,9 @@ static void track_controlled_window (WckUtils *win)
         else if (win->controlwindow == previous_control)
         {
             /* track previous upper maximized window state on desktop */
+            object_unref_nonnull(win->umaxwindow);
             win->umaxwindow = previous_umax;
+            object_ref_nonnull(win->umaxwindow);
             if (win->umaxwindow) {
                 win->msh = g_signal_connect(G_OBJECT(win->umaxwindow),
                                                "state-changed",
@@ -187,6 +215,9 @@ static void track_controlled_window (WckUtils *win)
         on_control_window_changed(win->controlwindow, previous_control, win->data);
     else
         on_wck_state_changed(win->controlwindow, win->data);
+
+    object_unref_nonnull(previous_control);
+    object_unref_nonnull(previous_umax);
 }
 
 
@@ -218,7 +249,9 @@ static void active_window_changed (XfwScreen *screen,
                                    WckUtils *win)
 {
 
+    object_unref_nonnull(win->activewindow);
     win->activewindow = xfw_screen_get_active_window(screen);
+    object_ref_nonnull(win->activewindow);
 
     if (win->activewindow
         && (win->activewindow != previous))
@@ -289,6 +322,7 @@ void init_wnck (WckUtils *win, gboolean only_maximized, gpointer data)
     win->activescreen = xfw_screen_get_default();
     win->workspacemanager = xfw_screen_get_workspace_manager(win->activescreen);
     win->activewindow = xfw_screen_get_active_window(win->activescreen);
+    object_ref_nonnull(win->activewindow);
     win->umaxwindow = NULL;
     win->controlwindow = NULL;
     win->only_maximized = only_maximized;
@@ -332,9 +366,16 @@ void disconnect_wnck (WckUtils *win)
     WorkspaceGroupHandlers *handlers;
 
     /* disconnect all signal handlers */
-    wck_signal_handler_disconnect (G_OBJECT(win->controlwindow), win->ash);
-    wck_signal_handler_disconnect (G_OBJECT(win->controlwindow), win->msh);
-    wck_signal_handler_disconnect (G_OBJECT(win->controlwindow), win->mwh);
+    if (win->activewindow)
+    {
+        wck_signal_handler_disconnect (G_OBJECT(win->activewindow), win->ash);
+    }
+
+    if (win->umaxwindow)
+    {
+        wck_signal_handler_disconnect (G_OBJECT(win->umaxwindow), win->msh);
+        wck_signal_handler_disconnect (G_OBJECT(win->umaxwindow), win->mwh);
+    }
 
     wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->sah);
     wck_signal_handler_disconnect (G_OBJECT(win->activescreen), win->sch);
