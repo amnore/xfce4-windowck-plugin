@@ -175,6 +175,10 @@ static void track_controlled_window (WckUtils *win)
         win->controlwindow = win->activewindow;
         object_ref_nonnull(win->controlwindow);
     }
+    else if (!win->activewindow) {
+        object_unref_nonnull(win->controlwindow);
+        win->controlwindow = NULL;
+    }
 
     if (!win->umaxwindow || (win->umaxwindow != previous_umax))
     {
@@ -253,8 +257,7 @@ static void active_window_changed (XfwScreen *screen,
     win->activewindow = xfw_screen_get_active_window(screen);
     object_ref_nonnull(win->activewindow);
 
-    if (win->activewindow
-        && (win->activewindow != previous))
+    if (win->activewindow != previous)
     {
         wck_signal_handler_disconnect (G_OBJECT(previous), win->ash);
 
