@@ -234,13 +234,22 @@ void resize_title (WckTitlePlugin *wtp)
     switch (wtp->prefs->size_mode)
     {
         case SHRINK:
+            gtk_label_set_width_chars (wtp->title, -1);
             gtk_label_set_max_width_chars (wtp->title, wtp->prefs->title_size);
+            xfce_panel_plugin_set_shrink(wtp->plugin, TRUE);
+            xfce_panel_plugin_set_expand(wtp->plugin, FALSE);
             break;
         case EXPAND:
-            gtk_label_set_max_width_chars (wtp->title, TITLE_SIZE_MAX);
+            gtk_label_set_width_chars (wtp->title, -1);
+            gtk_label_set_max_width_chars (wtp->title, -1);
+            xfce_panel_plugin_set_shrink(wtp->plugin, FALSE);
+            xfce_panel_plugin_set_expand(wtp->plugin, TRUE);
             break;
-        default:
+        case FIXED:
             gtk_label_set_width_chars (wtp->title, wtp->prefs->title_size);
+            gtk_label_set_max_width_chars (wtp->title, wtp->prefs->title_size);
+            xfce_panel_plugin_set_shrink(wtp->plugin, FALSE);
+            xfce_panel_plugin_set_expand(wtp->plugin, FALSE);
             break;
     }
 }

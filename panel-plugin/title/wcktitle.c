@@ -144,10 +144,6 @@ wcktitle_new (XfcePanelPlugin *plugin)
     /* get the current orientation */
     orientation = xfce_panel_plugin_get_orientation(plugin);
 
-    /* not needed for shrink mode */
-    if (wtp->prefs->size_mode != SHRINK)
-        xfce_panel_plugin_set_shrink (plugin, TRUE);
-
     /* create some panel widgets */
     wtp->ebox = gtk_event_box_new ();
     gtk_event_box_set_visible_window (GTK_EVENT_BOX (wtp->ebox), FALSE);
@@ -155,7 +151,6 @@ wcktitle_new (XfcePanelPlugin *plugin)
 
     wtp->box = gtk_box_new (orientation, 2);
     gtk_box_set_homogeneous (GTK_BOX (wtp->box), FALSE);
-    gtk_widget_set_halign (wtp->box, GTK_ALIGN_CENTER);
     gtk_widget_set_valign (wtp->box, GTK_ALIGN_CENTER);
     gtk_widget_set_margin_top (wtp->box, DEFAULT_TITLE_PADDING);
     gtk_widget_set_margin_bottom (wtp->box, DEFAULT_TITLE_PADDING);
@@ -202,19 +197,6 @@ wcktitle_orientation_changed (XfcePanelPlugin *plugin, GtkOrientation orientatio
 {
     /* change the orienation of the box */
     gtk_orientable_set_orientation (GTK_ORIENTABLE (wtp->box), orientation);
-}
-
-
-static void
-wcktitle_screen_position_changed (XfcePanelPlugin *plugin, XfceScreenPosition *position, WckTitlePlugin *wtp)
-{
-    if (wtp->prefs->size_mode != SHRINK)
-    {
-        xfce_panel_plugin_set_shrink (plugin, FALSE);
-        gtk_label_set_width_chars (wtp->title, 1);
-        xfce_panel_plugin_set_shrink (plugin, TRUE);
-        resize_title (wtp);
-    }
 }
 
 
@@ -279,9 +261,6 @@ wcktitle_construct (XfcePanelPlugin *plugin)
 
     g_signal_connect (G_OBJECT (plugin), "size-changed",
                       G_CALLBACK (wcktitle_size_changed), wtp);
-
-    g_signal_connect (G_OBJECT (plugin), "screen-position-changed",
-                      G_CALLBACK (wcktitle_screen_position_changed), wtp);
 
     g_signal_connect (G_OBJECT (plugin), "orientation-changed",
                       G_CALLBACK (wcktitle_orientation_changed), wtp);
